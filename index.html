@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading Exchange</title>
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .container { max-width: 600px; margin: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+    button { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Trading Exchange</h1>
+    <div>
+      <h3>Your Balance</h3>
+      <p>USD: <span id="usd-balance">0</span></p>
+      <p>ASSET: <span id="asset-balance">0</span></p>
+    </div>
+
+    <div>
+      <h3>Place Order</h3>
+      <input type="number" id="price" placeholder="Price" required />
+      <input type="number" id="amount" placeholder="Amount" required />
+      <button onclick="placeOrder('buy')">Buy</button>
+      <button onclick="placeOrder('sell')">Sell</button>
+    </div>
+
+    <h3>Order Book</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Price</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody id="order-book"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const gun = Gun(); // Initialize Gun.js
+    const orderBook = gun.get('orderBook');
+    const usdBalanceEl = document.getElementById('usd-balance');
+    const assetBalanceEl = document.getElementById('asset-balance');
+    const orderBookEl = document.getElementById('order-book');
+    orderBookEl.innerHTML = '';
+
+    // Initialize balances in localStorage if not set
+    if (!localStorage.getItem('usdBalance')) {
+      localStorage.setItem('usdBalance', 1000); // Default USD balance
+    }
+    if (!localStorage.getItem('assetBalance')) {
+      localStorage.setItem('assetBalance', 10); // Default asset balance
+    }
+
+    // Update balance UI
+    function updateBalances() {
+      usdBalanceEl.textContent = localStorage.getItem('usdBalance');
+      assetBalanceEl.textContent = localStorage.getItem('assetBalance');
+      console.log("Balances updated:", {
+        usd: localStorage.getItem('usdBalance'),
+        asset: localStorage.getItem('assetBalance')
+      });
+    }
+
+    // Add an order to the order book
+    function placeOrder(type) {
+      const price = parseFloat(document.getElementById('price').value);
+      const amount = parseFloat(document.getElementById('amount').value);
+
+      if (!price || !amount) {
+        alert('Please enter valid price and amount.');
+        return;
+      }
+
+      // Check balances
+      if (type === 'buy') {
+        const usdBalance = parseFloat(localStorage.getItem('usdBalance'));
+        if (usdBalance < price * amount) {
+          alert('Insufficient USD balance.');
+          return;
+        }
+        localStorage.setItem('usdBalance', usdBalance - price * amount);
+        console.log(`Placing buy order: Price ${price}, Amount ${amount}`);
+      } else if (type === 'sell') {
+        const assetBalance = parseFloat(localStorage.getItem('assetBalance'));
+        if (assetBalance < amount) {
+          alert('Insufficient ASSET balance.');
+          return;
+        }
+        localStorage.setItem('assetBalance', assetBalance - amount);
+        console.log(`Placing sell order: Price ${price}, Amount ${amount}`);
+      }
+
+      // Add order to Gun.js
+      const orderData = { type, price, amount, timestamp: Date.now() };
+      console.log("Adding order to Gun:", orderData);
+      orderBook.set(orderData);
+
+      // Update balances and log action
+      updateBalances();
+    }
+
+    // Render order book
+    function renderOrderBook(order) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${order.type}</td>
+        <td>${order.price.toFixed(2)}</td>
+        <td>${order.amount.toFixed(2)}</td>
+      `;
+      orderBookEl.appendChild(row);
+      console.log("Order book rendered:", order);
+    }
+
+    // Subscribe to order book updates
+    
+    orderBook.map().on((order, id) => {
+      if (!order) return; // Ignore null updates
+      console.log("Received order update:", order);
+      renderOrderBook(order);
+    });
+
+    // Initial load
+    updateBalances();
+  </script>
+</body>
+</html>
+
